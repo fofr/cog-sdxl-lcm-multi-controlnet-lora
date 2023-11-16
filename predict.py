@@ -7,13 +7,7 @@ import numpy as np
 import torch
 from cog import BasePredictor, Input, Path
 from diffusers import (
-    DDIMScheduler,
     DiffusionPipeline,
-    DPMSolverMultistepScheduler,
-    EulerAncestralDiscreteScheduler,
-    EulerDiscreteScheduler,
-    HeunDiscreteScheduler,
-    PNDMScheduler,
     LCMScheduler,
     StableDiffusionXLImg2ImgPipeline,
     StableDiffusionXLInpaintPipeline,
@@ -34,29 +28,13 @@ from sizing_strategy import SizingStrategy
 SDXL_MODEL_CACHE = "./sdxl-cache"
 REFINER_MODEL_CACHE = "./refiner-cache"
 SAFETY_CACHE = "./safety-cache"
+LCM_CACHE = "./lcm-cache"
 FEATURE_EXTRACTOR = "./feature-extractor"
 SDXL_URL = "https://weights.replicate.delivery/default/sdxl/sdxl-vae-upcast-fix.tar"
 REFINER_URL = (
     "https://weights.replicate.delivery/default/sdxl/refiner-no-vae-no-encoder-1.0.tar"
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
-
-
-class KarrasDPM:
-    def from_config(config):
-        return DPMSolverMultistepScheduler.from_config(config, use_karras_sigmas=True)
-
-
-SCHEDULERS = {
-    "DDIM": DDIMScheduler,
-    "DPMSolverMultistep": DPMSolverMultistepScheduler,
-    "HeunDiscrete": HeunDiscreteScheduler,
-    "KarrasDPM": KarrasDPM,
-    "K_EULER_ANCESTRAL": EulerAncestralDiscreteScheduler,
-    "K_EULER": EulerDiscreteScheduler,
-    "PNDM": PNDMScheduler,
-    "LCM": LCMScheduler,
-}
 
 
 def download_weights(url, dest):
@@ -120,6 +98,12 @@ class Predictor(BasePredictor):
             use_safetensors=True,
             variant="fp16",
         )
+
+        print("Loading lcm-lora-sdxl...")
+        self.txt2img_pipe.load_lora_weights(
+            "latent-consistency/lcm-lora-sdxl", cache_dir=LCM_CACHE
+        )
+        self.txt2img_pipe.fuse_lora()
         self.is_lora = False
         if weights or os.path.exists("./trained-model"):
             self.load_trained_weights(weights, self.txt2img_pipe)
@@ -230,16 +214,11 @@ class Predictor(BasePredictor):
             le=4,
             default=1,
         ),
-        scheduler: str = Input(
-            description="scheduler",
-            choices=SCHEDULERS.keys(),
-            default="K_EULER",
-        ),
         num_inference_steps: int = Input(
-            description="Number of denoising steps", ge=1, le=500, default=30
+            description="Number of denoising steps", ge=1, le=30, default=4
         ),
         guidance_scale: float = Input(
-            description="Scale for classifier-free guidance", ge=1, le=50, default=7.5
+            description="Scale for classifier-free guidance", ge=1, le=50, default=2
         ),
         prompt_strength: float = Input(
             description="Prompt strength when using img2img / inpaint. 1.0 corresponds to full destruction of information in image",
@@ -497,7 +476,7 @@ class Predictor(BasePredictor):
             pipe.watermark = None
             self.refiner.watermark = None
 
-        pipe.scheduler = SCHEDULERS[scheduler].from_config(pipe.scheduler.config)
+        pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
         generator = torch.Generator("cuda").manual_seed(seed)
 
         common_args = {
