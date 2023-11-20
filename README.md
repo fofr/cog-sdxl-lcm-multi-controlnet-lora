@@ -1,11 +1,12 @@
-# cog-sdxl-multi-controlnet-lora
+# cog-sdxl-lcm-multi-controlnet-lora
 
-https://replicate.com/fofr/sdxl-multi-controlnet-lora
+https://replicate.com/fofr/sdxl-lcm-multi-controlnet-lora
 
-[![Replicate demo and cloud API](https://replicate.com/fofr/sdxl-multi-controlnet-lora/badge)](https://replicate.com/fofr/sdxl-multi-controlnet-lora)
+[![Replicate demo and cloud API](https://replicate.com/fofr/sdxl-lcm-multi-controlnet-lora/badge)](https://replicate.com/fofr/sdxl-lcm-multi-controlnet-lora)
 
 SDXL with:
 
+- LCM lora for massive speed increase
 - img2img
 - inpainting
 - custom Replicate lora loading
@@ -26,3 +27,5 @@ SDXL with:
 - SDXL refiner
 - Image resizing based on width/height, input image or a control image
 - Disable safety checker via API
+
+Based on https://github.com/fofr/cog-sdxl-multi-controlnet-lora
