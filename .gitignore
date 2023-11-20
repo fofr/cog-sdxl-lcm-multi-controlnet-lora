@@ -1,7 +1,10 @@
+lcm-cache
 model_cache
 refiner-cache
 sdxl-cache
 safety-cache
+controlnet-cache
+controlnet-preprocessor-cache
 trained-model
 temp
 temp_in

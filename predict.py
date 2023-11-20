@@ -1,5 +1,4 @@
 import os
-import subprocess
 import time
 from typing import List, Optional
 
@@ -21,6 +20,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 )
 from transformers import CLIPImageProcessor
 from weights_manager import WeightsManager
+from weights_downloader import WeightsDownloader
 from controlnet import ControlNet
 from sizing_strategy import SizingStrategy
 
@@ -35,15 +35,6 @@ REFINER_URL = (
     "https://weights.replicate.delivery/default/sdxl/refiner-no-vae-no-encoder-1.0.tar"
 )
 SAFETY_URL = "https://weights.replicate.delivery/default/sdxl/safety-1.0.tar"
-
-
-def download_weights(url, dest):
-    start = time.time()
-    print("downloading url: ", url)
-    print("downloading to: ", dest)
-    subprocess.check_call(["pget", "-x", url, dest], close_fds=False)
-    print("downloading took: ", time.time() - start)
-
 
 class Predictor(BasePredictor):
     def load_trained_weights(self, weights, pipe):
@@ -81,15 +72,14 @@ class Predictor(BasePredictor):
             weights = None
 
         print("Loading safety checker...")
-        if not os.path.exists(SAFETY_CACHE):
-            download_weights(SAFETY_URL, SAFETY_CACHE)
+        WeightsDownloader.download_if_not_exists(SAFETY_URL, SAFETY_CACHE)
+
         self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
             SAFETY_CACHE, torch_dtype=torch.float16
         ).to("cuda")
         self.feature_extractor = CLIPImageProcessor.from_pretrained(FEATURE_EXTRACTOR)
 
-        if not os.path.exists(SDXL_MODEL_CACHE):
-            download_weights(SDXL_URL, SDXL_MODEL_CACHE)
+        WeightsDownloader.download_if_not_exists(SDXL_URL, SDXL_MODEL_CACHE)
 
         print("Loading sdxl txt2img pipeline...")
         self.txt2img_pipe = DiffusionPipeline.from_pretrained(
@@ -140,8 +130,7 @@ class Predictor(BasePredictor):
         # FIXME(ja): if the answer to above is use VAE/Text_Encoder_2 from fine-tune
         #            what does this imply about lora + refiner? does the refiner need to know about
 
-        if not os.path.exists(REFINER_MODEL_CACHE):
-            download_weights(REFINER_URL, REFINER_MODEL_CACHE)
+        WeightsDownloader.download_if_not_exists(REFINER_URL, REFINER_MODEL_CACHE)
 
         print("Loading refiner pipeline...")
         self.refiner = DiffusionPipeline.from_pretrained(
@@ -218,7 +207,7 @@ class Predictor(BasePredictor):
             description="Number of denoising steps", ge=1, le=30, default=4
         ),
         guidance_scale: float = Input(
-            description="Scale for classifier-free guidance", ge=1, le=50, default=2
+            description="Scale for classifier-free guidance", ge=0, le=50, default=1.1
         ),
         prompt_strength: float = Input(
             description="Prompt strength when using img2img / inpaint. 1.0 corresponds to full destruction of information in image",
